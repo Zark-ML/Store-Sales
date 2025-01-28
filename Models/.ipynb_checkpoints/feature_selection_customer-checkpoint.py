@@ -1,9 +1,11 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.feature_selection import RFE, SelectKBest, r_regression
+from sklearn.feature_selection import RFE, SelectKBest, r_regression, SequentialFeatureSelector
 from sklearn.base import BaseEstimator
 from sklearn.metrics import mean_squared_log_error
+from boruta import BorutaPy
+from sklearn.ensemble import RandomForestRegressor
 
 class Feature_selection_custom:
     """
@@ -20,21 +22,6 @@ class Feature_selection_custom:
         """
         self.X = X
         self.y = y
-    
-    def select_k_best(self,k: int = 10):
-        """
-        Select the top k features based on univariate statistical tests.
-
-        Args:
-            k (int): Number of top features to select.
-
-        Returns:
-            pd.DataFrame: Reduced feature set with k selected features.
-        """
-        selector = SelectKBest(score_func=r_regression, k=k)
-        X_selected = selector.fit_transform(self.X, self.y)
-        selected_columns = self.X.columns[selector.get_support()]
-        return pd.DataFrame(X_selected, columns=selected_columns)
 
     def recursive_feature_elimination(self, estimator: BaseEstimator, n_features_to_select: int = 5):
         """
@@ -52,70 +39,73 @@ class Feature_selection_custom:
         selected_columns = self.X.columns[rfe.support_]
         return pd.DataFrame(self.X[selected_columns])
 
-    def get_feature_support(self, method: str, *args, **kwargs):
+    def sequential_feature_selector(self, estimator: BaseEstimator, direction: str = 'forward', n_features_to_select: int = 5):
         """
-        Get a boolean mask of selected features for a given method.
+        Perform Sequential Feature Selection (SFS).
 
         Args:
-            method (str): The feature selection method ('k_best', 'rfe', or 'r_regression').
-            *args: Positional arguments for the method.
-            **kwargs: Keyword arguments for the method.
+            estimator (BaseEstimator): A model with a `fit` method.
+            direction (str): 'forward' for forward selection, 'backward' for backward elimination.
+            n_features_to_select (int): Number of features to select.
 
         Returns:
-            pd.Series: Boolean mask of selected features.
+            pd.DataFrame: Reduced feature set with selected features.
         """
-
-        match(method):
-            case 'k_best':
-                return self.select_k_best(args,kwargs)
-            case 'rfe':
-                return self.recursive_feature_elimination(args,kwargs)
-            case _:
-                raise ValueError(f"Invalid feature selection method: {method}")
-
-
-    def feature_selection_score_plot(self,method,estimator: BaseEstimator, max_k=None):
-        """
-        Plot model performance (e.g., accuracy) for different values of k (number of features selected) using feature selection.
-
-        Args:
-            X (pd.DataFrame): The feature matrix.
-            y (pd.Series): The target vector.
-            estimator (BaseEstimator): A model with a `fit` method, such as LogisticRegression or RandomForestClassifier.
-            max_k (int): The maximum number of top features to consider. If None, it uses the total number of features.
-        """
-        if max_k is None:
-            max_k = self.X.shape[1]
-
-        # List to store performance scores for each value of k
-        scores = []
-
-        # Loop through different values of k (number of features selected)
-        for k in range(1, max_k + 1):
-            # Initialize RFE with the given estimator and number of features to select
-            if method == 'RFE':
-                selector = RFE(estimator, n_features_to_select=k)
-            elif method == 'k_best':
-                selector = SelectKBest(score_func=r_regression, k=k)
-            selector.fit(self.X, self.y)
-            
-            # Get the selected features and reduce X to the selected features
-            X_selected = self.X.iloc[:, selector.support_]
-
-            # Train the estimator on the selected features and evaluate performance
-            estimator.fit(X_selected, self.y)
-            y_pred = estimator.predict(X_selected)
-            
-            # Calculate accuracy or other metric (you can customize this)
-            score = mean_squared_log_error(self.y, y_pred)
-            scores.append(score)
+        if direction not in ['forward', 'backward']:
+            raise ValueError("Invalid direction. Use 'forward' or 'backward'.")
         
-        # Plot the performance (e.g., accuracy) vs number of features selected (k)
-        plt.figure(figsize=(10, 6))
-        plt.plot(range(1, max_k + 1), scores, marker='o')
-        plt.title('Performance vs Number of Features Selected (RFE)')
-        plt.xlabel('Number of Features Selected')
-        plt.ylabel('Accuracy')
-        plt.grid(True)
-        plt.xticks(range(1, max_k + 1))  # Ensure ticks for all values of k
-        plt.show()
+        sfs = SequentialFeatureSelector(estimator=estimator, n_features_to_select=n_features_to_select, direction=direction)
+        sfs.fit(self.X, self.y)
+        selected_columns = self.X.columns[sfs.get_support()]
+        return pd.DataFrame(self.X[selected_columns])
+    
+    
+    def boruta_select(self, estimator: BaseEstimator, **kwargs):
+        """
+        Perform Boruta feature selection.
+        
+        Arguments:
+        estimator (BaseEstimator): A model with a `fit` method.
+        kwargs (dict): Additional keyword arguments to be passed to BorutaPy.
+        
+        Keyword Arguments:
+        n_estimators (int): Number of estimators for BorutaPy.
+        perc (float): Percentage of features to select.
+        alpha (float): Significance level for BorutaPy.
+        two_step (bool): If True, perform two-step Boruta.
+        max_iter (int): Maximum number of iterations for BorutaPy.
+        random_state (int): Random state for BorutaPy.
+        verbose (int): Verbosity level for BorutaPy.
+        early_stopping (bool): If True, stop BorutaPy early if the score doesn't improve for n_iter_no_change iterations.
+        n_iter_no_change (int): Number of iterations without improvement after which BorutaPy stops.
+        """
+        boruta_args = {
+            'n_estimators': 1000,
+            'perc': 100,
+            'alpha': 0.05,
+            'two_step': True,
+            'max_iter': 100,
+            'random_state': None,
+            'verbose': 0,
+            'early_stopping': False,
+            'n_iter_no_change': 20
+        }
+        boruta_args.update(kwargs)
+        boruta = BorutaPy(estimator=estimator, **boruta_args)
+        boruta.fit(self.X, self.y)
+        selected_columns = np.array(self.X.columns)[boruta.support_]
+        return pd.DataFrame(self.X[selected_columns])
+
+if __name__=='__main__':
+    data = pd.read_csv("data.csv").iloc[:200000,:]
+    data = data.drop(columns=["date"])  # Drop unnecessary column
+    data_target = data["sales"]
+    data_features = data.drop(columns=["sales"])
+
+    model = RandomForestRegressor(n_jobs=10)
+    feature_selector = Feature_selection_custom(data_features.values, data_target)
+    print(feature_selector.boruta_select(model, random_state=42,verbose=1))
+
+    
+
+    

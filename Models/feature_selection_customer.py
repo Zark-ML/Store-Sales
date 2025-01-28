@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 from sklearn.feature_selection import RFE, SelectKBest, r_regression, SequentialFeatureSelector
 from sklearn.base import BaseEstimator
 from sklearn.metrics import mean_squared_log_error
-
+from boruta import BorutaPy
+from sklearn.ensemble import RandomForestRegressor
 
 class Feature_selection_custom:
     """
@@ -57,80 +58,55 @@ class Feature_selection_custom:
         sfs.fit(self.X, self.y)
         selected_columns = self.X.columns[sfs.get_support()]
         return pd.DataFrame(self.X[selected_columns])
-
-    def get_feature_support(self, method: str,direction:str, *args, **kwargs):
+    
+    
+    def boruta_select(self, estimator: BaseEstimator, **kwargs):
         """
-        Get a boolean mask of selected features for a given method.
-
-        Args:
-            method (str): The feature selection method ('k_best', 'rfe', 'sequential').
-            *args: Positional arguments for the method.
-            **kwargs: Keyword arguments for the method.
-
-        Returns:
-            pd.Series: Boolean mask of selected features.
+        Perform Boruta feature selection.
+        
+        Arguments:
+        estimator (BaseEstimator): A model with a `fit` method.
+        kwargs (dict): Additional keyword arguments to be passed to BorutaPy.
+        
+        Keyword Arguments:
+        n_estimators (int): Number of estimators for BorutaPy.
+        perc (float): Percentage of features to select.
+        alpha (float): Significance level for BorutaPy.
+        two_step (bool): If True, perform two-step Boruta.
+        max_iter (int): Maximum number of iterations for BorutaPy.
+        random_state (int): Random state for BorutaPy.
+        verbose (int): Verbosity level for BorutaPy.
+        early_stopping (bool): If True, stop BorutaPy early if the score doesn't improve for n_iter_no_change iterations.
+        n_iter_no_change (int): Number of iterations without improvement after which BorutaPy stops.
         """
-        match method:
-            case 'rfe':
-                estimator = kwargs.get('estimator')
-                n_features_to_select = kwargs.get('n_features_to_select', 5)
-                if estimator is None:
-                    raise ValueError("An 'estimator' argument is required for RFE.")
-                rfe = RFE(estimator=estimator, n_features_to_select=n_features_to_select)
-                rfe.fit(self.X, self.y)
-                return pd.Series(rfe.support_, index=self.X.columns)
-            case 'sequential':
-                estimator = kwargs.get('estimator')
-                n_features_to_select = kwargs.get('n_features_to_select', 5)
-                if estimator is None:
-                    raise ValueError("An 'estimator' argument is required for Sequential Feature Selector.")
-                sfs = SequentialFeatureSelector(estimator=estimator, direction=direction, n_features_to_select=n_features_to_select)
-                sfs.fit(self.X, self.y)
-                return pd.Series(sfs.get_support(), index=self.X.columns)
-            case _:
-                raise ValueError(f"Invalid feature selection method: {method}")
+        boruta_args = {
+            'n_estimators': 1000,
+            'perc': 100,
+            'alpha': 0.05,
+            'two_step': True,
+            'max_iter': 100,
+            'random_state': None,
+            'verbose': 0,
+            'early_stopping': False,
+            'n_iter_no_change': 20
+        }
+        boruta_args.update(kwargs)
+        boruta = BorutaPy(estimator=estimator, **boruta_args)
+        boruta.fit(self.X, self.y)
+        selected_columns = np.array(self.X.columns)[boruta.support_]
+        return pd.DataFrame(self.X[selected_columns])
 
-    def feature_selection_score_plot(self, method: str, estimator: BaseEstimator, max_k=None, **kwargs):
-        """
-        Plot model performance (e.g., mean squared log error) for different values of k using feature selection.
+if __name__=='__main__':
+    data = pd.read_csv("data.csv").iloc[:200000,:]
+    
+    data = data.drop(columns=["date"])  # Drop unnecessary column
+    data_target = data["sales"]
+    data_features = data.drop(columns=["sales"])
 
-        Args:
-            method (str): Feature selection method ('RFE', 'k_best', or 'sequential').
-            estimator (BaseEstimator): A model with a `fit` method, such as LogisticRegression or RandomForest.
-            max_k (int): The maximum number of top features to consider. If None, it uses the total number of features.
-        """
-        if max_k is None:
-            max_k = self.X.shape[1]
+    model = RandomForestRegressor(n_jobs=10)
+    feature_selector = Feature_selection_custom(data_features.values, data_target)
+    print(feature_selector.boruta_select(model, random_state=42,verbose=1))
 
-        # List to store performance scores for each value of k
-        scores = []
+    
 
-        # Loop through different values of k (number of features selected)
-        for k in range(1, max_k + 1):
-            if method == 'RFE':
-                selector = RFE(estimator, n_features_to_select=k)
-                selector.fit(self.X, self.y)
-                X_selected = self.X.iloc[:, selector.support_]
-            elif method == 'sequential':
-                direction = kwargs.get('direction', 'forward')
-                sfs = SequentialFeatureSelector(estimator=estimator, n_features_to_select=k, direction=direction)
-                sfs.fit(self.X, self.y)
-                X_selected = self.X.iloc[:, sfs.get_support()]
-            else:
-                raise ValueError("Invalid method. Use 'RFE' or 'sequential'.")
-
-            # Train the estimator on the selected features and evaluate performance
-            estimator.fit(X_selected, self.y)
-            y_pred = estimator.predict(X_selected)
-            score = mean_squared_log_error(self.y, y_pred)
-            scores.append(score)
-
-        # Plot the performance (e.g., mean squared log error) vs number of features selected (k)
-        plt.figure(figsize=(10, 6))
-        plt.plot(range(1, max_k + 1), scores, marker='o', label=method)
-        plt.title(f'Performance vs Number of Features Selected ({method})')
-        plt.xlabel('Number of Features Selected')
-        plt.ylabel('Mean Squared Log Error')
-        plt.legend()
-        plt.grid(True)
-        plt.show()
+    
