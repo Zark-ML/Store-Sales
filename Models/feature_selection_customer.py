@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.feature_selection import RFE, SelectKBest, r_regression, SequentialFeatureSelector
+from sklearn.feature_selection import RFE,SequentialFeatureSelector
 from sklearn.base import BaseEstimator
 from sklearn.metrics import mean_squared_log_error
 from boruta import BorutaPy
@@ -94,6 +94,7 @@ class Feature_selection_custom:
         boruta = BorutaPy(estimator=estimator, **boruta_args)
         boruta.fit(self.X, self.y)
         selected_columns = np.array(self.X.columns)[boruta.support_]
+        print(boruta.support_)
         return pd.DataFrame(self.X[selected_columns])
 
 if __name__=='__main__':
@@ -103,9 +104,13 @@ if __name__=='__main__':
     data_target = data["sales"]
     data_features = data.drop(columns=["sales"])
 
-    model = RandomForestRegressor(n_jobs=10)
-    feature_selector = Feature_selection_custom(data_features.values, data_target)
-    print(feature_selector.boruta_select(model, random_state=42,verbose=1))
+    model = RandomForestRegressor(n_jobs=-1)
+    feature_selector = Feature_selection_custom(data_features, data_target)
+    print(feature_selector.boruta_select(model, random_state=42,verbose=1,max_iter=40))
+    """
+    ['family', 'city', 'state', 'store_type', 'cluster', 'transactions',
+       'day', 'day_of_week']
+    """
 
     
 
