@@ -3,9 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.feature_selection import RFE,SequentialFeatureSelector
 from sklearn.base import BaseEstimator
-from sklearn.metrics import mean_squared_log_error
 from boruta import BorutaPy
 from sklearn.ensemble import RandomForestRegressor
+import xgboost as xgb
 
 class Feature_selection_custom:
     """
@@ -96,18 +96,79 @@ class Feature_selection_custom:
         selected_columns = np.array(self.X.columns)[boruta.support_]
         print(boruta.support_)
         return pd.DataFrame(self.X[selected_columns])
+    
+    import xgboost as xgb
+import numpy as np
+
+def xgboost_select(self, estimator: xgb.XGBRegressor = None, threshold: float = 0.0, **kwargs):
+    """
+    Perform XGBoost feature selection based on feature importances.
+
+    Arguments:
+    estimator (xgb.XGBRegressor): An XGBoost model instance. If None, defaults to XGBRegressor.
+    threshold (float): Minimum importance threshold to select features. Features with importance > threshold will be selected.
+    kwargs (dict): Additional keyword arguments to be passed to the XGBoost model.
+
+    Keyword Arguments:
+    n_estimators (int): Number of estimators for XGBoost.
+    max_depth (int): Maximum depth of trees.
+    learning_rate (float): Learning rate.
+    subsample (float): Subsample ratio of the training instances.
+    colsample_bytree (float): Subsample ratio of columns when constructing each tree.
+    random_state (int): Random state for reproducibility.
+    verbose (int): Verbosity level for XGBoost.
+    early_stopping_rounds (int): Early stopping rounds for XGBoost.
+    """
+    # Default XGBoost arguments
+    xgb_args = {
+        'n_estimators': 100,
+        'max_depth': 6,
+        'learning_rate': 0.1,
+        'subsample': 0.8,
+        'colsample_bytree': 0.8,
+        'random_state': None,
+        'verbose': 0,
+        'early_stopping_rounds': 10
+    }
+    
+    # Update default arguments with any passed in kwargs
+    xgb_args.update(kwargs)
+    
+    # If no estimator is provided, use XGBRegressor with the specified arguments
+    if estimator is None:
+        estimator = xgb.XGBRegressor(**xgb_args)
+    
+    # Fit the model to the data
+    estimator.fit(self.X, self.y, eval_set=[(self.X, self.y)], early_stopping_rounds=xgb_args['early_stopping_rounds'])
+    
+    # Get feature importances and filter based on the threshold
+    feature_importances = estimator.feature_importances_
+    selected_columns = np.array(self.X.columns)[feature_importances > threshold]
+    
+    # Print the feature importances
+    print("Feature Importances: ", feature_importances)
+    
+    # Return the names of selected features based on importance threshold
+    return selected_columns
 
 if __name__=='__main__':
-    data = pd.read_csv("data.csv").iloc[:200000,:]
+    data = pd.read_csv(r"C:\Users\user\Desktop\Store-Sales\data\data.csv").iloc[:200000,:]
     
     data = data.drop(columns=["date"])  # Drop unnecessary column
     data_target = data["sales"]
     data_features = data.drop(columns=["sales"])
 
-    model = RandomForestRegressor(n_jobs=-1)
-    feature_selector = Feature_selection_custom(data_features, data_target)
-    print(feature_selector.boruta_select(model, random_state=42,verbose=1,max_iter=40))
+    # model = RandomForestRegressor(n_jobs=-1)
+    # feature_selector = Feature_selection_custom(data_features, data_target)
+    # print(feature_selector.boruta_select(model, random_state=42,verbose=1,max_iter=40))
+    
+    model = Feature_selection_custom(data_features, data_target)
+    selected_features = model.xgboost_select(estimator=None, threshold=0.05, n_estimators=200, max_depth=8,verbose=1,n_jobs=10)
+    print("Selected features:", selected_features)
+
+    
     """
+    RandomForestRegressor
     ['family', 'city', 'state', 'store_type', 'cluster', 'transactions',
        'day', 'day_of_week']
     """
