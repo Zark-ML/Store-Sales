@@ -2,10 +2,13 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.feature_selection import RFE,SequentialFeatureSelector
-from sklearn.base import BaseEstimator
+from sklearn.base import BaseEstimator,TransformerMixin
 from boruta import BorutaPy
 from sklearn.ensemble import RandomForestRegressor
 import xgboost as xgb
+from sklearn.feature_selection import mutual_info_regression
+
+
 
 class Feature_selection_custom:
     """
@@ -150,20 +153,43 @@ class Feature_selection_custom:
         # Return the names of selected features based on importance threshold
         return selected_columns
 
-if __name__=='__main__':
-    data = pd.read_csv(r"C:\Users\user\Desktop\Store-Sales\data\data.csv").iloc[:200000,:]
-    
-    data = data.drop(columns=["date"])  # Drop unnecessary column
-    data_target = data["sales"]
-    data_features = data.drop(columns=["sales"])
 
+class RMRMFeatureSelector(BaseEstimator, TransformerMixin):
+    def __init__(self, n_features_to_select):
+        self.n_features_to_select = n_features_to_select
+
+    def fit(self, X, y):
+        # Calculate mutual information for each feature with the target
+        self.mi_scores_ = mutual_info_regression(X, y)
+        return self
+
+    def transform(self, X):
+        # Select the top features based on mutual information
+        selected_features = np.argsort(self.mi_scores_)[-self.n_features_to_select:]
+        return X.iloc[:, selected_features]
+
+
+
+
+if __name__=='__main__':
+    data = pd.read_csv(r"C:\Users\user\Desktop\data\data.csv")
+    
+    # data = data.drop(columns=["date"])  # Drop unnecessary column
+    # data_target = data["sales"]
+    # data_features = data.drop(columns=["sales"])
+
+    # rmrm_selector = RMRMFeatureSelector(n_features_to_select=10)  # Adjust the number of features to select
+    # X_selected = rmrm_selector.fit_transform(data_features, data_target)
+
+    # print(X_selected.columns)
+    # Boruta
     # model = RandomForestRegressor(n_jobs=-1)
     # feature_selector = Feature_selection_custom(data_features, data_target)
     # print(feature_selector.boruta_select(model, random_state=42,verbose=1,max_iter=40))
-    
-    model = Feature_selection_custom(data_features, data_target)
-    selected_features = model.xgboost_select(estimator=None, threshold=0.03, n_estimators=200, max_depth=8,verbose=1,n_jobs=10)
-    print("Selected features:", selected_features)
+    # xgbselector
+    # model = Feature_selection_custom(data_features, data_target)
+    # selected_features = model.xgboost_select(estimator=None, threshold=0.03, n_estimators=400, max_depth=8,verbose=1,n_jobs=10)
+    # print("Selected features:", selected_features)
 
     
     """
@@ -173,7 +199,10 @@ if __name__=='__main__':
     
     xgb
     Selected features: ['family' 'city' 'state' 'store_type',
-      'cluster' 'transactions''day_of_week']
+      'cluster' 'transactions''day_of_week' 'onpromotion' 'year']
+
+    RMRM
+    Selected features: ['day of week' 'store_type' 'year' 'state' 'oil' 'city' 'cluster' 'transaction' 'onpromotion' 'family']
     """
 
     
