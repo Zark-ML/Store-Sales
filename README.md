@@ -1,6 +1,6 @@
-## Store-Sales
+# Store-Sales
 The purpose of this project is to create a system that can predict the sales of different types of products across store networks. The main goal is to determine daily sales for specific product types.
-# Key features 
+## Key features 
 store_nbr identifies the store at which the products are sold.
 family identifies the type of product sold.
 sales gives the total sales for a product family at a particular store at a given date. Fractional values are possible since products can be sold in fractional units (1.5 kg of cheese, for instance, as opposed to 1 bag of chips).
