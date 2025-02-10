@@ -26,11 +26,17 @@ Predicted sales can be exported to a CSV file for further analysis or reporting 
 Python 3.x
 ### Libraries/Frameworks:
 Pandas (for data manipulation)
+
 Scikit-learn (for machine learning models)
+
 NumPy (for numerical operations)
+
 Matplotlib (for plotting graphs)
+
 Seaborn (for statistical data visualization)
+
 Pickle (for serializing models)
+
 ### Tools:
 PyCharm (for development)
 OS (for interacting with the operating system)
