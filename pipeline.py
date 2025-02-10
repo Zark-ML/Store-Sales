@@ -1,10 +1,13 @@
+import pickle
+import os
+
+
 import numpy as np
 import pandas as pd
-import pickle
 
 # sales predictor pipeline:
 
-models_path = [f"{i}_family_model.pkl" for i in range(33)]
+models_path = [rf"C:\Users\Student\Desktop\Store-Sales\family_models\{i}_family_model.pkl" for i in range(33)]
 
 class SalesPredictor:
     def __init__(self, model_paths:list,data_path: str)-> None:
@@ -17,7 +20,7 @@ class SalesPredictor:
         self.models : list = []
         for path in model_paths:
             with open(path, 'rb') as file:
-                self.models.append(pickle.load(file))
+                self.models.append(pickle.load(file, encoding='latin1'))
         self.data : pd.DataFrame = pd.read_csv(data_path)
         self.fitted : bool = False
     def fit(self)->None:
@@ -101,6 +104,36 @@ class SalesPredictor:
 
 
 
-#TODO:test the class
+
+# Define paths to your existing files
+
+DATA_PATH = r"C:\Users\Student\Desktop\Store-Sales\testing_data.csv"  # Ensure this file exists
+
+def test_sales_predictor():
+    """Runs a test on the SalesPredictor pipeline using real files."""
+    
+    
+    
+    # Ensure data file exists
+    assert os.path.exists(DATA_PATH), f"Data file missing: {DATA_PATH}"
+
+    # Initialize predictor
+    predictor = SalesPredictor(models_path, DATA_PATH)
+
+    # Fit the model (preprocess data)
+    predictor.fit()
+    assert predictor.fitted, "Model should be fitted after calling fit()"
+
+    # Run predictions
+    predictions = predictor.predict()
+    
+    # Validate predictions
+    assert isinstance(predictions, pd.Series), "Predictions should be a pandas Series"
+    assert len(predictions) > 0, "Predictions should not be empty"
+    assert all(predictions >= 0), "Predictions should be non-negative"
+
+    print("✅ SalesPredictor test passed successfully!")
+
+# Run the test
 if __name__ == '__main__':
-    pass
+    test_sales_predictor()
