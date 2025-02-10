@@ -7,7 +7,7 @@ The purpose of this project is to create a system that can predict the sales of 
 ## Key Features
 - **date**: Day in which was done research.
 - **family**: Identifies the type of product sold.
-- **sales**: Represents the total sales for a product family at a particular store on a given date. Fractional values are possible, as products can be sold in fractional units (e.g., 1.5 kg of cheese vs. 1 bag of chips).
+- **sales**: Represents the total sales for a product family at a particular store on a given date. Fractional values are possible, as products can be sold in fractional units.
 - **onpromotion**: Represents the total number of items in a product family that were being promoted at a store on a given date.
 
 ## Problem Solved and Usefulness
