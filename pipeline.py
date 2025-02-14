@@ -92,7 +92,6 @@ class SalesPredictor:
             raise Exception("Model not fitted. Please call the fit method first.")
 
         predictions = pd.DataFrame(columns=['id', 'sales'])
-        specific_family = [11, 22, 25, 30]
 
         for family in range(33):
             # Correct data filtering for family
@@ -115,11 +114,10 @@ class SalesPredictor:
                 print(f"Error in model for family {family}: {e}")
                 continue
 
-            log_transformer = FunctionTransformer(np.log1p, inverse_func=np.expm1, validate=True)
+            with open("C:\Users\user\Desktop\Store-Sales\transformer.pkl","rb") as f:
+                transformer = pickle.load(f)
 
-            if family in specific_family:
-                # Apply inverse log transformation for specific families
-                test_predict = log_transformer.inverse_transform(test_predict.reshape(-1, 1)).flatten()
+            test_predict = transformer.inverse_transform(test_predict.reshape(-1, 1)).flatten()
 
             current_sales = pd.DataFrame({'id': family_id, 'sales': test_predict})
 
@@ -127,6 +125,7 @@ class SalesPredictor:
 
         predictions = predictions.sort_values(by='id', ascending=True)
 
+        predictions = predictions.reset_index("id")
         # Save predictions
         predictions.to_csv("submit_data.csv", index=False)
 
