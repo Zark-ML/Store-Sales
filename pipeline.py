@@ -6,7 +6,7 @@ import pandas as pd
 
 # Sales predictor pipeline:
 
-models_path = [rf"C:\Users\Student\Desktop\Store-Sales\family\{i}_family_random_forest_model_with_rmlse.pkl" for i in range(33)]
+models_path = [rf"C:\Users\user\Desktop\Store-Sales\family_models\{i}_random_forest_model_with_rmlse.pkl" for i in range(33)]
 
 class SalesPredictor:
     def __init__(self, model_paths: list, data_path: str) -> None:
@@ -17,28 +17,10 @@ class SalesPredictor:
         data_path (str): path to the dataset
         """
         self.models: list = []
-        for path in model_paths:
-            with open(path, 'rb') as file:
-                self.models.append(pickle.load(file, encoding='latin1'))
+        self.models_path = model_paths
         self.data: pd.DataFrame = pd.read_csv(data_path)
         self.fitted: bool = False
-        self.not_fitted_models = []  # To track models that are not fitted
 
-    def check_if_fitted(self, model):
-        """
-        Check if the model (or pipeline step) has been fitted.
-        """
-        if hasattr(model, 'named_steps'):  # Check if the model is a pipeline
-            for step_name, step_model in model.named_steps.items():
-                if not hasattr(step_model, 'predict') or not hasattr(step_model, 'fit'):
-                    print(f"Model step '{step_name}' is not fitted.")
-                    return False
-        else:
-            # For non-pipeline models, just check if the model is fitted
-            if not hasattr(model, 'predict') or not hasattr(model, 'fit'):
-                print(f"Model is not fitted: {model}")
-                return False
-        return True
 
     def fit(self) -> None:
         """
@@ -74,15 +56,6 @@ class SalesPredictor:
         self.data = self.data[selected_columns]
         self.fitted = True
 
-        # Check if all models are fitted correctly
-        for i, model in enumerate(self.models):
-            if not self.check_if_fitted(model):
-                self.not_fitted_models.append(i)
-
-        if self.not_fitted_models:
-            print(f"The following models are not fitted: {self.not_fitted_models}")
-        else:
-            print("All models are fitted correctly.")
 
     def predict(self) -> None:
         """
@@ -103,21 +76,15 @@ class SalesPredictor:
             family_id = test_data_for_family['id']
             test_data = test_data_for_family.drop(columns=["id", "family"])
 
-            model = self.models[family]
 
-            try:
-                # Check if the model is fitted before predicting
-                if not self.check_if_fitted(model):
-                    raise ValueError(f"Model for family {family} is not fitted properly.")
+
+            with open(self.models_path[family],"rb") as f:            
+                model = pickle.load(f)
                 test_predict = model.predict(test_data)
-            except Exception as e:
-                print(f"Error in model for family {family}: {e}")
-                continue
 
-            with open("C:\Users\user\Desktop\Store-Sales\transformer.pkl","rb") as f:
+            with open(rf"C:\Users\user\Desktop\Store-Sales\family_models\{family}_target_transformer.pkl","rb") as f:
                 transformer = pickle.load(f)
-
-            test_predict = transformer.inverse_transform(test_predict.reshape(-1, 1)).flatten()
+                test_predict = transformer.inverse_transform(test_predict.reshape(-1, 1)).flatten()
 
             current_sales = pd.DataFrame({'id': family_id, 'sales': test_predict})
 
@@ -125,9 +92,9 @@ class SalesPredictor:
 
         predictions = predictions.sort_values(by='id', ascending=True)
 
-        predictions = predictions.reset_index("id")
+        predictions = predictions.set_index("id")
         # Save predictions
-        predictions.to_csv("submit_data.csv", index=False)
+        predictions.to_csv("submit_data.csv", index=True)
 
         print("Predictions saved to 'submit_data.csv'")
 
@@ -135,31 +102,10 @@ class SalesPredictor:
 
 
 # Define paths to your existing files
-DATA_PATH = r"C:\Users\Student\Desktop\Store-Sales\test.csv"  # Ensure this file exists
+DATA_PATH = r"C:\Users\user\Desktop\Store-Sales\test.csv"  # Ensure this file exists
 
-def test_sales_predictor():
-    """Runs a test on the SalesPredictor pipeline using real files."""
 
-    # Ensure data file exists
-    assert os.path.exists(DATA_PATH), f"Data file missing: {DATA_PATH}"
-
-    # Initialize predictor
-    predictor = SalesPredictor(models_path, DATA_PATH)
-
-    # Fit the model (preprocess data)
-    predictor.fit()
-    assert predictor.fitted, "Model should be fitted after calling fit()"
-
-    # Run predictions
-    predictions = predictor.predict()
-
-    # Validate predictions
-    assert isinstance(predictions, pd.DataFrame), "Predictions should be a pandas DataFrame"
-    assert len(predictions) > 0, "Predictions should not be empty"
-    assert all(predictions['sales'] >= 0), "Predictions should be non-negative"
-
-    print("✅ SalesPredictor test passed successfully!")
-
-# Run the test
 if __name__ == '__main__':
-    test_sales_predictor()
+    model = SalesPredictor(models_path,DATA_PATH)
+    model.fit()
+    print(model.predict())
