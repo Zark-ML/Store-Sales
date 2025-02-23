@@ -6,7 +6,7 @@ import pandas as pd
 
 # Sales predictor pipeline:
 
-models_path = [rf"C:\Users\user\Desktop\Store-Sales\family_models\{i}_random_forest_model_with_rmlse.pkl" for i in range(33)]
+models_path = [rf"C:\Users\user\Desktop\Store-Sales\family_models\{i}_adaboost_model_with_rmlse.pkl" for i in range(33)]
 
 class SalesPredictor:
     def __init__(self, model_paths: list, data_path: str) -> None:
@@ -50,7 +50,7 @@ class SalesPredictor:
         state_mapping = {state: idx for idx, state in enumerate(self.data['state'].unique())}
         self.data['state'] = self.data['state'].replace(state_mapping)
 
-        store_type_mapping = {category: idx for idx, category in enumerate(self.data['store_type'].unique())}
+        store_type_mapping = {state: idx for idx, state in enumerate(self.data['store_type'].unique())}
         self.data['store_type'] = self.data['store_type'].replace(store_type_mapping)
 
         self.data = self.data[selected_columns]
